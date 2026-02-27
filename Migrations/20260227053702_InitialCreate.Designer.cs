@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LunchAndLearn_AIIntegration.Migrations
 {
     [DbContext(typeof(DB))]
-    [Migration("20260227024407_InitialCreate")]
+    [Migration("20260227053702_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -18,6 +18,36 @@ namespace LunchAndLearn_AIIntegration.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.24");
+
+            modelBuilder.Entity("LunchAndLearn_AIIntegration.Data.Models.AIConfiguration", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Objective")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AI");
+                });
+
+            modelBuilder.Entity("LunchAndLearn_AIIntegration.Data.Models.AIConfigurationContext", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AIContext");
+                });
 
             modelBuilder.Entity("LunchAndLearn_AIIntegration.Data.Models.AI_KoboldAssessment", b =>
                 {
@@ -41,6 +71,10 @@ namespace LunchAndLearn_AIIntegration.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("Context")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Message")
                         .IsRequired()

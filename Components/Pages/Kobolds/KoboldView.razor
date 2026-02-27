@@ -1,5 +1,81 @@
-﻿<h3>KoboldView</h3>
+﻿@page "/kobold/{Id:int}"
+@using LunchAndLearn_AIIntegration.AI
+@using LunchAndLearn_AIIntegration.Data.Models
+@using LunchAndLearn_AIIntegration.Data.Repositories
+
+@rendermode InteractiveServer
+
+@inject KoboldRepository _koboldRepo;
+@inject AIRepository _aiRepo;
+@inject NavigationManager _nav;
+@inject AiService _ai;
+
+<MudCard>
+	<MudCardHeader>
+		<MudText>Kobold: @(_kobold.Name)</MudText>
+	</MudCardHeader>
+	<MudCardContent>
+		<MudGrid>
+			<MudItem xs="6">
+				<MudText>Message: @(_kobold.Message)</MudText>
+			</MudItem>
+			<MudItem xs="6">
+				@if(_assessment != null)
+				{
+					<MudText>Response: @(_assessment.Response)</MudText>
+					<MudText>Confidence: @(_assessment.ConfidenceLevel)</MudText>
+					<MudTable Items="_assessment.Items">
+						<HeaderContent>
+							<MudTh>Item Found</MudTh>
+						</HeaderContent>
+						<RowTemplate>
+							<MudTd><MudText>@(context.Name)</MudText></MudTd>
+						</RowTemplate>
+					</MudTable>
+				}
+			</MudItem>
+		</MudGrid>
+		<MudCardActions>
+			@if (_assessing)
+			{
+				<MudProgressCircular Indeterminate />
+			}
+			else
+			{
+				<MudButton OnClick="@(() => Assess())">Assess</MudButton>
+			}
+		</MudCardActions>
+	</MudCardContent>
+</MudCard>
 
 @code {
 
+	[Parameter]
+	public int Id { get; set; }
+
+	Kobold _kobold {get; set;}
+	Assessment _assessment { get; set; }
+
+	protected override async Task OnParametersSetAsync()
+	{
+		_kobold = await _koboldRepo.GetKobold(Id);
+
+		if (_kobold == null) { 
+			_nav.NavigateTo("kobolds");
+		}
+		else
+		{
+			_assessment = await _aiRepo.GetAssessmentForKobold(_kobold.Id);
+		}
+	}
+
+	bool _assessing = false;
+	protected async Task Assess()
+	{
+		_assessing = true;
+		await _ai.AssessKobold(Id);
+		_assessment = await _aiRepo.GetAssessmentForKobold(_kobold.Id);
+		_assessing = false;
+		StateHasChanged();
+	}
 }

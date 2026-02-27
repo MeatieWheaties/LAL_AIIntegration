@@ -3,7 +3,6 @@
     public class Kobold : Entity
     {
         public string Name { get; set; } = string.Empty;
-        public string Context { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
     }
 }

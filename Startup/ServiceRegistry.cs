@@ -1,5 +1,6 @@
 ﻿using LunchAndLearn_AIIntegration.AI;
 using LunchAndLearn_AIIntegration.Data;
+using LunchAndLearn_AIIntegration.Data.Repositories;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using OpenAI.Chat;
@@ -42,6 +43,9 @@ namespace LunchAndLearn_AIIntegration.Startup
             });
 
             _builder.Services.AddTransient<AiService>();
+            _builder.Services.AddTransient<AIRepository>();
+            _builder.Services.AddTransient<KoboldRepository>();
+            _builder.Services.AddTransient<ItemRepository>();
 
         }
     }

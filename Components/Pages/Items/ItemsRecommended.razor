@@ -1,0 +1,55 @@
+﻿@page "/items"
+@using LunchAndLearn_AIIntegration.Data
+@using LunchAndLearn_AIIntegration.Data.Models
+@using LunchAndLearn_AIIntegration.Data.Repositories
+@using Microsoft.EntityFrameworkCore
+
+@inject ItemRepository _itemRepo;
+@inject IDbContextFactory<DB> _db;
+
+@rendermode InteractiveServer
+
+<MudGrid>
+	<MudItem xs="6">
+
+	</MudItem>
+	<MudItem xs="6">
+		<MudTable @ref=_table Items="Items" MultiSelection @bind-SelectedItems=_Selection>
+			<HeaderContent>
+				<MudTh>Item</MudTh>
+				<MudTh>Recommended By</MudTh>
+			</HeaderContent>
+			<RowTemplate>
+				<MudTd DataLabel="Recommendations">@(context.Name)</MudTd>
+				<MudTd DataLabel="Recommendations">@(_Trace[context.Id].Name)</MudTd>
+			</RowTemplate>
+		</MudTable>
+	</MudItem>
+</MudGrid>
+
+@code {
+
+	private MudTable<Item> _table;
+
+	List<Item> Items { get; set; } = new List<Item>();
+
+	HashSet<Item> _Selection { get; set; } = new HashSet<Item>();
+
+	Dictionary<int, Kobold> _Trace = new Dictionary<int, Kobold>();
+
+	protected override async Task OnParametersSetAsync()
+	{
+		Items = await _itemRepo.GetItemsAsync();
+
+		using var _ = await _db.CreateDbContextAsync();
+
+		_Trace.Clear();
+		foreach(var item in Items)
+		{
+			var _assessment = _.Assessments.FirstOrDefault(x => x.Id == item.AssessmentId);
+			var _kobold = _.Kobolds.FirstOrDefault(x => x.Id == _assessment.KoboldId);
+
+			_Trace.Add(item.Id, _kobold);
+		}
+	}
+}

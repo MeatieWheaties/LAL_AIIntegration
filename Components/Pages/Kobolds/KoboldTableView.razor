@@ -3,31 +3,39 @@
 @using LunchAndLearn_AIIntegration.AI
 @using LunchAndLearn_AIIntegration.Data
 @using LunchAndLearn_AIIntegration.Data.Models
+@using LunchAndLearn_AIIntegration.Data.Repositories
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.EntityFrameworkCore.Internal
 
 @inject IDbContextFactory<DB> _db;
+@inject NavigationManager _nav;
 @inject AiService _ai;
+@inject AIRepository _aiRepo;
+@inject KoboldRepository _koboldRepo;
 
 <MudCard>
 	<MudGrid>
-		<MudItem xs="6">
+		<MudItem xs="8">
 			<MudTable Items="_Kobold.Keys" Context="_">
 				<HeaderContent>
 					<MudTh>Kobold</MudTh>
 					<MudTh>Message</MudTh>
-					<MudTh>AI Assessment</MudTh>
+					<MudTh>Ranking</MudTh>
+					<MudTh></MudTh>
+					<MudTh></MudTh>
 					<MudTh></MudTh>
 				</HeaderContent>
 				<RowTemplate>
 					<MudTd>@(_Kobold[_].Name)</MudTd>
 					<MudTd>@(_Kobold[_].Message)</MudTd>
-					<MudTd>@(_AI_KoboldAssessments[_].Assessment)</MudTd>
-					<MudTd><MudButton OnClick="@(() => Assess(_))">?</MudButton></MudTd>
+					<MudTd>@(_AI_Assessments.ContainsKey(_) ? _AI_Assessments[_].ConfidenceLevel.ToString() : "")</MudTd>
+					<MudTd><MudButton OnClick="@(() => Assess(_))">Assess</MudButton></MudTd>
+					<MudTd><MudButton OnClick="@(() => _nav.NavigateTo($"kobold/{_}"))">Details</MudButton></MudTd>
+					<MudTd><MudButton OnClick="@(() => RemoveKobold(_))">Delete</MudButton></MudTd>
 				</RowTemplate>
 			</MudTable>
 		</MudItem>
-		<MudItem xs="6">
+		<MudItem xs="4">
 			<MudForm>
 				<MudInput Label="Kobold Name" @bind-Value=Kobold_Name />
 				<MudTextField Label="Message" @bind-Value=Kobold_Message />
@@ -40,7 +48,7 @@
 @code {
 
 	Dictionary<int, Kobold> _Kobold { get; set; } = new Dictionary<int, Kobold>();
-	Dictionary<int, AI_KoboldAssessment> _AI_KoboldAssessments { get; set; } = new Dictionary<int, AI_KoboldAssessment>();
+	Dictionary<int, Assessment> _AI_Assessments { get; set; } = new Dictionary<int, Assessment>();
 
 	#region New Kobold Entry
 
@@ -53,24 +61,13 @@
 		{
 			using var _ = await _db.CreateDbContextAsync();
 
-			var _kobold = new Kobold
-				{
-					Name = koboldName,
-					Message = koboldMessage
-				};
+			var _kobold = await _koboldRepo.AddKobold(koboldName, koboldMessage);
 
-			_.Kobolds.Add(_kobold);
-			await _.SaveChangesAsync();
-
-			var _aiAssessment = new AI_KoboldAssessment
-				{
-					KoboldId = _kobold.Id,
-					Assessment = KoboldAssessment.New
-				};
-
-			_.AI_KoboldAssessments.Add(_aiAssessment);
-			await _.SaveChangesAsync();
-			StateHasChanged();
+			if (_kobold != null)
+			{
+				await _ai.AssessKobold(_kobold.Id);
+				StateHasChanged();
+			}
 		}
 		catch (Exception)
 		{
@@ -79,16 +76,34 @@
 		finally
 		{
 			_Kobold = await GetKobolds();
-			_AI_KoboldAssessments = await GetKoboldAssessments();
+			_AI_Assessments = await GetKoboldAssessments();
+		}
+	}
+
+	protected async Task RemoveKobold(int id)
+	{
+		var _result = await _koboldRepo.RemoveKobold(id);
+		if (_result)
+		{
+			_Kobold = await GetKobolds();
+			_AI_Assessments = await GetKoboldAssessments();
+			StateHasChanged();
 		}
 	}
 
 	#endregion
 
+	protected async Task Assess(int id)
+	{
+		await _ai.AssessKobold(id);
+		_AI_Assessments = await GetKoboldAssessments();
+		StateHasChanged();
+	}
+
 	protected override async Task OnParametersSetAsync()
 	{
 		_Kobold = await GetKobolds();
-		_AI_KoboldAssessments = await GetKoboldAssessments();
+		_AI_Assessments = await GetKoboldAssessments();
 	}
 
 	async Task<Dictionary<int, Kobold>> GetKobolds()
@@ -109,38 +124,8 @@
 		}
 	}
 
-	async Task<Dictionary<int, AI_KoboldAssessment>> GetKoboldAssessments()
+	async Task<Dictionary<int, Assessment>> GetKoboldAssessments()
 	{
-		using var _context = await _db.CreateDbContextAsync();
-		try
-		{
-			var _result = new Dictionary<int, AI_KoboldAssessment>();
-			foreach (var _assessment in _context.AI_KoboldAssessments)
-			{
-				_result.Add(_assessment.KoboldId, _assessment);
-			}
-			return _result;
-		}
-		catch (Exception)
-		{
-			return new Dictionary<int, AI_KoboldAssessment>();
-		}
-	}
-
-	async Task Assess(int koboldId)
-	{
-		try
-		{
-			await _ai.AssessKobold(koboldId);
-		}
-		catch (Exception)
-		{
-
-		}
-		finally
-		{
-			_AI_KoboldAssessments = await GetKoboldAssessments();
-			StateHasChanged();
-		}
+		return await _aiRepo.GetAssessmentsAsync();
 	}
 }

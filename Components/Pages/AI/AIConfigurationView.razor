@@ -1,0 +1,85 @@
+﻿@page "/ai"
+
+@rendermode InteractiveServer
+@using LunchAndLearn_AIIntegration.Data.Models
+@using LunchAndLearn_AIIntegration.Data.Repositories
+
+@inject AIRepository _aiRepo;
+
+<h3>The Magic Orb</h3>
+
+<MudToolBar>
+<MudButton Disabled=!_changes OnClick="@(() => SaveChanges())">Save Changes</MudButton>
+</MudToolBar>
+
+
+<MudTextField Label="Objective" @bind-Value=_ObjectiveText />
+
+<MudForm>
+	<MudCard>
+		<MudCardContent>
+			<MudInput @bind-Value=_contextEntry />
+		</MudCardContent>
+		<MudCardActions>
+			<MudButton Disabled=@(string.IsNullOrEmpty(_contextEntry)) OnClick=AppendContext>+ Add Context</MudButton>
+		</MudCardActions>
+	</MudCard>
+</MudForm>
+<MudTable Items="_config.Context" Context="_">
+	<HeaderContent>
+		<MudTh>Context</MudTh>
+		<MudTh></MudTh>
+	</HeaderContent>
+	<RowTemplate>
+		<MudTd>@(_.Value)</MudTd>
+		<MudTd><MudButton OnClick="@(() => RemoveContext(_))">Delete</MudButton></MudTd>
+	</RowTemplate>
+</MudTable>
+
+@code {
+
+
+	AIConfiguration _config { get; set; }
+
+	string _contextEntry { get; set; } = string.Empty;
+
+	string _ObjectiveText
+	{
+		get => _config.Objective;
+		set
+		{
+			_changes = true;
+			_config.Objective = value;
+		}
+	}
+
+	void AppendContext()
+	{
+		_config.Context.Add(new AIConfigurationContext
+		{
+			Value = _contextEntry
+		});
+		_contextEntry = "";
+		_changes = true;
+	}
+
+	void RemoveContext(AIConfigurationContext context)
+	{
+		_config.Context.Remove(context);
+		_changes = true;
+	}
+
+	bool _changes { get; set; } = false;
+	async Task SaveChanges()
+	{
+		_changes = false;
+		await _aiRepo.UpdateConfiguration(_config);
+		StateHasChanged();
+		_config = await _aiRepo.GetConfigAsync();
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		_config = await _aiRepo.GetConfigAsync();
+	}
+}

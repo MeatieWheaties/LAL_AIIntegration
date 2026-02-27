@@ -14,6 +14,14 @@
 
         public DbSet<Kobold> Kobolds => Set<Kobold>();
         public DbSet<AI_KoboldAssessment> AI_KoboldAssessments => Set<AI_KoboldAssessment>();
+
+        public DbSet<AIConfiguration> AI => Set<AIConfiguration>();
+
+        public DbSet<AIConfigurationContext> AIContext => Set<AIConfigurationContext>();
+
+        public DbSet<Assessment> Assessments => Set<Assessment>();
+
+        public DbSet<Item> Items => Set<Item>();
     }
 
     public class TodoItem : Entity

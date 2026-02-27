@@ -2,6 +2,7 @@
 {
     using LunchAndLearn_AIIntegration.Data;
     using LunchAndLearn_AIIntegration.Data.Models;
+    using LunchAndLearn_AIIntegration.Data.Repositories;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Internal;
     using OpenAI.Chat;
@@ -11,6 +12,8 @@
     public sealed class AiService
     {
         readonly IDbContextFactory<DB> _db;
+
+        readonly AIRepository _aiRepo;
         private readonly ChatClient _chat;
 
         private static readonly JsonSerializerOptions JsonOpts = new()
@@ -19,10 +22,11 @@
             WriteIndented = false,
         };
 
-        public AiService(IDbContextFactory<DB> db, ChatClient client)
+        public AiService(IDbContextFactory<DB> db, ChatClient client, AIRepository aiRepo)
         {
             _db = db;
             _chat = client;
+            _aiRepo = aiRepo;
         }
 
         public async Task<TOut> AskStructuredAsync<TIn, TOut>(
@@ -68,39 +72,6 @@
             return result;
         }
 
-        public async Task<string> AskAsync(string userText, CancellationToken ct = default)
-        {
-            return "";
-            //var options = new CreateResponseOptions
-            //{
-
-            //};
-
-            //options.InputItems.Add(ResponseItem.CreateUserMessageItem(userText));
-
-            //var response = await _client.CreateResponseAsync(options, ct);
-            //// SDK shape varies a bit by version; the README shows iterating OutputItems.
-            //// A common pattern is to pull the first message text you find:
-            //var msg = response.Value.OutputItems.OfType<MessageResponseItem>().FirstOrDefault();
-            //return msg?.Content?.FirstOrDefault()?.Text ?? "";
-        }
-
-        const string CONTEXT = "This kobold is often in gardens and digging in dirt.";
-
-        const string OBJECTIVE = "Determine if this kobold has mentioned any edible foods that are acceptable for human standards. List any foods found in the Items array. Leave a response for how useful the kobold's input is. Ignore crude and bad grammar. Focus just on actionable items.";
-
-        const string OUTPUT_SCHEMA = """
-{
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "response": { "type": "string" },
-    "items": { "type": "array", "items": { "type": "string" } }
-  },
-  "required": ["response", "items"]
-}
-""";
-
         public async Task AssessKobold(int id)
         {
             try
@@ -111,19 +82,66 @@
 
                 if (_kobold == null) return;
 
-                var _assess = await AskStructuredAsync<Input, Output>(OBJECTIVE, new Input
+                var _ai = await _aiRepo.GetConfigAsync();
+
+                var _assess = await AskStructuredAsync<Input, Output>(_ai.RenderContext(), new Input
                 {
                     KoboldName = _kobold.Name,
                     KoboldMessage = _kobold.Message,
-                    Context = CONTEXT,
-                }, BinaryData.FromString(OUTPUT_SCHEMA));
+                }, BinaryData.FromString(Output.SCHEMA));
 
-                var _test = _assess;
+                var _assessment = new Assessment
+                {
+                    KoboldId = _kobold.Id,
+                    Response = _assess.Response,
+                    ConfidenceLevel = _assess.ConfidenceLevel,
+                    Items = new List<Item>()
+                };
+                foreach(var item in _assess.Items)
+                {
+                    _assessment.Items.Add(new Item
+                    {
+                        Name = item
+                    });
+                }
+
+                await _aiRepo.CommitAssessment(_assessment);
             }
             catch (Exception ex)
             {
                 var _catch = ex;
             }
+        }
+
+        public async Task AssessFoodRecomendations(string request, List<Item> items)
+        {
+            try
+            {
+                await using var _ = await _db.CreateDbContextAsync();
+
+                var _assess = await AskStructuredAsync<string, Output>(request,
+                    RenderFoodList(items), BinaryData.FromString(Output.SCHEMA));
+
+                var _test = _assess;
+
+            } catch (Exception ex)
+            {
+
+            }
+        }
+        
+        string RenderFoodList(List<Item> items)
+        {
+            var _result = "";
+
+            for(int x = 0; x < items.Count; x++)
+            {
+                if (x == 0)
+                    _result += items[x].Name;
+                else _result += ", " + items[x].Name;
+            }
+
+            return _result;
         }
     }
 }
