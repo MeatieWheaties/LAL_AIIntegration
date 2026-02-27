@@ -22,6 +22,8 @@
         public DbSet<Assessment> Assessments => Set<Assessment>();
 
         public DbSet<Item> Items => Set<Item>();
+
+        public DbSet<FoodRecommendation> Recommendations => Set<FoodRecommendation>();
     }
 
     public class TodoItem : Entity

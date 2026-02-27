@@ -1,27 +1,51 @@
 ﻿@page "/items"
+@using LunchAndLearn_AIIntegration.AI
 @using LunchAndLearn_AIIntegration.Data
 @using LunchAndLearn_AIIntegration.Data.Models
 @using LunchAndLearn_AIIntegration.Data.Repositories
 @using Microsoft.EntityFrameworkCore
 
 @inject ItemRepository _itemRepo;
+@inject AiService _ai;
 @inject IDbContextFactory<DB> _db;
 
 @rendermode InteractiveServer
 
 <MudGrid>
 	<MudItem xs="6">
-
+		<MudTable Items="Recommendations">
+			<HeaderContent>
+				<MudTh>Recommendation</MudTh>
+				<MudTh>Ingredients</MudTh>
+				<MudTh></MudTh>
+			</HeaderContent>
+			<RowTemplate>
+				<MudTd DataLabel="Recommendation">@(context.Recommendation)</MudTd>
+				<MudTd DataLabel="Ingredients">@(context.Ingredients)</MudTd>
+				<MudTd><MudButton OnClick="@(() => DeleteRecommendation(context))">Delete</MudButton></MudTd>
+			</RowTemplate>
+		</MudTable>
 	</MudItem>
 	<MudItem xs="6">
+		@if (_requesting)
+		{
+			<MudProgressCircular Indeterminate/>
+		}
+		else
+		{
+			<MudForm>
+				<MudInput Label="Request" @bind-Value=_request/>
+				<MudButton OnClick="@(() => GenerateRecommendation())">Generate Recommendation</MudButton>
+			</MudForm>
+		}
 		<MudTable @ref=_table Items="Items" MultiSelection @bind-SelectedItems=_Selection>
 			<HeaderContent>
 				<MudTh>Item</MudTh>
 				<MudTh>Recommended By</MudTh>
 			</HeaderContent>
 			<RowTemplate>
-				<MudTd DataLabel="Recommendations">@(context.Name)</MudTd>
-				<MudTd DataLabel="Recommendations">@(_Trace[context.Id].Name)</MudTd>
+				<MudTd DataLabel="Item">@(context.Name)</MudTd>
+				<MudTd DataLabel="Recommended By">@(_Trace[context.Id].Name)</MudTd>
 			</RowTemplate>
 		</MudTable>
 	</MudItem>
@@ -33,15 +57,27 @@
 
 	List<Item> Items { get; set; } = new List<Item>();
 
+	List<FoodRecommendation> Recommendations { get; set; } = new List<FoodRecommendation>();
+
 	HashSet<Item> _Selection { get; set; } = new HashSet<Item>();
 
 	Dictionary<int, Kobold> _Trace = new Dictionary<int, Kobold>();
+
+	#region Generation
+
+	string _request { get; set; } = string.Empty;
+
+	bool _requesting { get; set; } = false;
+
+	#endregion
 
 	protected override async Task OnParametersSetAsync()
 	{
 		Items = await _itemRepo.GetItemsAsync();
 
 		using var _ = await _db.CreateDbContextAsync();
+
+		Recommendations = _.Recommendations.ToList();
 
 		_Trace.Clear();
 		foreach(var item in Items)
@@ -50,6 +86,48 @@
 			var _kobold = _.Kobolds.FirstOrDefault(x => x.Id == _assessment.KoboldId);
 
 			_Trace.Add(item.Id, _kobold);
+		}
+	}
+
+	async Task GenerateRecommendation()
+	{
+		try
+		{
+			_requesting = true;
+			var _result = await _ai.AssessFoodRecomendations(_request, _Selection.ToList());
+			if(_result != null)
+			{
+				using var _ = await _db.CreateDbContextAsync();
+				Recommendations = _.Recommendations.ToList();
+				StateHasChanged();
+			}
+		}
+		catch (Exception)
+		{
+
+		}
+		finally
+		{
+			_requesting = false;
+		}
+	}
+
+	async Task DeleteRecommendation(FoodRecommendation record)
+	{
+		try
+		{
+			using var _ = await _db.CreateDbContextAsync();
+
+			_.Recommendations.Remove(record);
+
+			await _.SaveChangesAsync();
+
+			Recommendations = _.Recommendations.ToList();
+			StateHasChanged();
+		}
+		catch (Exception)
+		{
+			
 		}
 	}
 }

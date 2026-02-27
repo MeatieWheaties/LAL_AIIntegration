@@ -3,11 +3,6 @@
     public class FoodRecommendation : Entity
     {
         public string Recommendation { get; set; }
-    }
-
-    public class FoodRecommendationComponents : Entity
-    {
-        public int RecommendationId { get; set; }
-        public int ItemId { get; set; }
+        public string Ingredients { get; set; }
     }
 }

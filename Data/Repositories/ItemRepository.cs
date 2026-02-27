@@ -18,5 +18,24 @@ namespace LunchAndLearn_AIIntegration.Data.Repositories
 
             return _.Items.ToList();
         }
+
+        public async Task CommitRecommendation(string recommendation, string ingredients)
+        {
+            try
+            {
+                using var _ = await _db.CreateDbContextAsync();
+
+                _.Recommendations.Add(new FoodRecommendation {
+                    Recommendation = recommendation,
+                    Ingredients = ingredients
+                });
+
+                await _.SaveChangesAsync();
+            }
+            catch (Exception)
+            {
+
+            }
+        }
     }
 }

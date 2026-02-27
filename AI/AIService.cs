@@ -72,6 +72,7 @@
             return result;
         }
 
+        const string KOBOLD_PREPROCESSOR = "Put your evaluation of the kobold's input in Response. List valid food items that fit the context in Items.";
         public async Task AssessKobold(int id)
         {
             try
@@ -84,7 +85,7 @@
 
                 var _ai = await _aiRepo.GetConfigAsync();
 
-                var _assess = await AskStructuredAsync<Input, Output>(_ai.RenderContext(), new Input
+                var _assess = await AskStructuredAsync<Input, Output>(_ai.RenderContext() + " " + KOBOLD_PREPROCESSOR, new Input
                 {
                     KoboldName = _kobold.Name,
                     KoboldMessage = _kobold.Message,
@@ -113,23 +114,51 @@
             }
         }
 
-        public async Task AssessFoodRecomendations(string request, List<Item> items)
+
+        const string RECOMENDATION_PREPROCESSOR = "Make a food recommendation and put it in the Response. List any ingredients individually in Items. Focus only on the dragon for the recommendation.";
+        public async Task<FoodRecommendation> AssessFoodRecomendations(string request, List<Item> items)
         {
             try
             {
                 await using var _ = await _db.CreateDbContextAsync();
 
-                var _assess = await AskStructuredAsync<string, Output>(request,
+                var _ai = _.AI.FirstOrDefault();
+                _ai.Context = _.AIContext.ToList();
+
+                var _assess = await AskStructuredAsync<string, Output>(request + " " + RECOMENDATION_PREPROCESSOR + _ai.RenderContext(),
                     RenderFoodList(items), BinaryData.FromString(Output.SCHEMA));
 
-                var _test = _assess;
+                var _record = new FoodRecommendation
+                {
+                    Recommendation = _assess.Response,
+                    Ingredients = RenderFoodList(_assess.Items)
+                };
 
+                _.Recommendations.Add(_record);
+
+                await _.SaveChangesAsync();
+
+                return _record;
             } catch (Exception ex)
             {
-
+                return null;
             }
         }
-        
+
+        string RenderFoodList(string[] items)
+        {
+            var _result = "";
+
+            for (int x = 0; x < items.Length; x++)
+            {
+                if (x == 0)
+                    _result += items[x];
+                else _result += ", " + items[x];
+            }
+
+            return _result;
+        }
+
         string RenderFoodList(List<Item> items)
         {
             var _result = "";
