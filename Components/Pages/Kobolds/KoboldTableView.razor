@@ -1,0 +1,146 @@
+﻿@page "/kobolds"
+@rendermode InteractiveServer
+@using LunchAndLearn_AIIntegration.AI
+@using LunchAndLearn_AIIntegration.Data
+@using LunchAndLearn_AIIntegration.Data.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.EntityFrameworkCore.Internal
+
+@inject IDbContextFactory<DB> _db;
+@inject AiService _ai;
+
+<MudCard>
+	<MudGrid>
+		<MudItem xs="6">
+			<MudTable Items="_Kobold.Keys" Context="_">
+				<HeaderContent>
+					<MudTh>Kobold</MudTh>
+					<MudTh>Message</MudTh>
+					<MudTh>AI Assessment</MudTh>
+					<MudTh></MudTh>
+				</HeaderContent>
+				<RowTemplate>
+					<MudTd>@(_Kobold[_].Name)</MudTd>
+					<MudTd>@(_Kobold[_].Message)</MudTd>
+					<MudTd>@(_AI_KoboldAssessments[_].Assessment)</MudTd>
+					<MudTd><MudButton OnClick="@(() => Assess(_))">?</MudButton></MudTd>
+				</RowTemplate>
+			</MudTable>
+		</MudItem>
+		<MudItem xs="6">
+			<MudForm>
+				<MudInput Label="Kobold Name" @bind-Value=Kobold_Name />
+				<MudTextField Label="Message" @bind-Value=Kobold_Message />
+				<MudButton Disabled=@(string.IsNullOrEmpty(Kobold_Name) || string.IsNullOrEmpty(Kobold_Message)) OnClick="@(() => AddKobold(Kobold_Name, Kobold_Message))">Add</MudButton>
+			</MudForm>
+		</MudItem>
+	</MudGrid>
+</MudCard>
+
+@code {
+
+	Dictionary<int, Kobold> _Kobold { get; set; } = new Dictionary<int, Kobold>();
+	Dictionary<int, AI_KoboldAssessment> _AI_KoboldAssessments { get; set; } = new Dictionary<int, AI_KoboldAssessment>();
+
+	#region New Kobold Entry
+
+	string Kobold_Name { get; set;} = string.Empty;
+	string Kobold_Message { get; set; } = string.Empty;
+
+	protected async Task AddKobold(string koboldName, string koboldMessage)
+	{
+		try
+		{
+			using var _ = await _db.CreateDbContextAsync();
+
+			var _kobold = new Kobold
+				{
+					Name = koboldName,
+					Message = koboldMessage
+				};
+
+			_.Kobolds.Add(_kobold);
+			await _.SaveChangesAsync();
+
+			var _aiAssessment = new AI_KoboldAssessment
+				{
+					KoboldId = _kobold.Id,
+					Assessment = KoboldAssessment.New
+				};
+
+			_.AI_KoboldAssessments.Add(_aiAssessment);
+			await _.SaveChangesAsync();
+			StateHasChanged();
+		}
+		catch (Exception)
+		{
+
+		}
+		finally
+		{
+			_Kobold = await GetKobolds();
+			_AI_KoboldAssessments = await GetKoboldAssessments();
+		}
+	}
+
+	#endregion
+
+	protected override async Task OnParametersSetAsync()
+	{
+		_Kobold = await GetKobolds();
+		_AI_KoboldAssessments = await GetKoboldAssessments();
+	}
+
+	async Task<Dictionary<int, Kobold>> GetKobolds()
+	{
+		using var _context = await _db.CreateDbContextAsync();
+		try
+		{
+			var _result = new Dictionary<int, Kobold>();
+			foreach(var _kobold in _context.Kobolds)
+			{
+				_result.Add(_kobold.Id, _kobold);
+			}
+			return _result;
+		}
+		catch (Exception)
+		{
+			return new Dictionary<int, Kobold>();
+		}
+	}
+
+	async Task<Dictionary<int, AI_KoboldAssessment>> GetKoboldAssessments()
+	{
+		using var _context = await _db.CreateDbContextAsync();
+		try
+		{
+			var _result = new Dictionary<int, AI_KoboldAssessment>();
+			foreach (var _assessment in _context.AI_KoboldAssessments)
+			{
+				_result.Add(_assessment.KoboldId, _assessment);
+			}
+			return _result;
+		}
+		catch (Exception)
+		{
+			return new Dictionary<int, AI_KoboldAssessment>();
+		}
+	}
+
+	async Task Assess(int koboldId)
+	{
+		try
+		{
+			await _ai.AssessKobold(koboldId);
+		}
+		catch (Exception)
+		{
+
+		}
+		finally
+		{
+			_AI_KoboldAssessments = await GetKoboldAssessments();
+			StateHasChanged();
+		}
+	}
+}
