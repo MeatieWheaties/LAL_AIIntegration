@@ -122,6 +122,7 @@
             }
             catch (Exception ex)
             {
+                var _catch = ex;
             }
         }
     }
